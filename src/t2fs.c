@@ -432,7 +432,125 @@ Entra:	filename -> nome do arquivo a ser apagado.
 Saída:	Se a operação foi realizada com sucesso, a função retorna "0" (zero).
 	Em caso de erro, será retornado um valor diferente de zero.
 -----------------------------------------------------------------------------*/
-int delete2 (char *filename);
+int delete2 (char *filename)
+{
+    if(iniciar()==SUCESSO)
+    {
+
+    DWORD nro_cluster, ultimo_cluster;
+	char* componente;
+	char* path;
+	int qtd=0;
+
+	path = malloc(sizeof(char)*strlen(filename));
+	strcpy(path, filename);
+
+	while ((componente = strsep(&path, "/")) != NULL)
+    {
+        if (strcmp(componente, "") == 0)
+        {
+            if(path == NULL)
+                return ERRO;
+
+        continue;
+        }
+
+        // inserir validação de nome.
+
+        qtd++;
+    }
+
+    char *pathArray[qtd];
+    }
+    // transformar filename para array.
+
+/*
+
+
+
+	char *pathArray[qtd];
+
+	filenameToArray(filename,pathArray);
+
+	if(qtd>0){
+
+		if(filename[0]=='/'){
+			//ler a partir da raiz
+			clusterNumber = superbloco->RootDirCluster;
+
+		}
+		else{
+			clusterNumber = cwdDirCluster;
+		}
+
+		ultimoClusterEncontrado = clusterNumber;
+		int i;
+		for (i = 0; i < qtd-1; ++i) {
+
+			clusterNumber = existDir(ultimoClusterEncontrado,pathArray[i]);
+
+			if(clusterNumber!=-1){
+				ultimoClusterEncontrado = clusterNumber;
+			}
+			else{
+				return -1;
+			}
+		}
+
+		struct t2fs_record* fileRecord = getFileEntry(ultimoClusterEncontrado, pathArray[qtd - 1]);
+
+		if(fileRecord!=NULL && fileRecord->TypeVal!=0x00){
+
+			DWORD fat_entry = fileRecord->firstCluster;
+			DWORD fatEntryDel;
+
+			//deletando entrada na FAT relacionado ao arquivo
+			while(fat_entry >= 0x00000002 && fat_entry<=0xFFFFFFFD){
+				//printf("FAT entry: 0x%08X\n",fat_entry);
+				fatEntryDel = fat_entry;
+				fat_entry = readFromFAT(fatEntryDel);
+				writeToFAT(fatEntryDel, 0x00000000);
+				readFromFAT(fatEntryDel);
+			}
+
+			deleteFileEntry(ultimoClusterEncontrado,fileRecord->name);
+
+			return 0;
+		}
+		else{
+			//nao foi possivel deletar: nao existe arquivo  ou arquivo invalido
+			return -1;
+		}
+	}
+
+	return -1;
+
+
+
+
+}
+
+int validaNome(char* nome){
+
+	//printf("size %d\n",strlen(nome));
+	if(strlen(nome)>MAX_FILE_NAME_SIZE){
+		//printf("Name is too long.\n");
+		return -1;
+	}
+	int i;
+	for (i = 0; i <strlen(nome) ; ++i) {
+		if(nome[i]<0x21||nome[i]>0x7a){
+			return -1;
+		}
+
+	}
+	return 0;
+}
+
+*/
+
+
+}
 
 
 /*-----------------------------------------------------------------------------
