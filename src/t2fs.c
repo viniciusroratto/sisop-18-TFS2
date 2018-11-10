@@ -447,7 +447,7 @@ int delete2 (char *filename)
 
 	while ((componente = strsep(&path, "/")) != NULL)
     {
-        if (strcmp(componente, "") == 0)
+        if (strcmp(componente,"") == 0)
         {
             if(path == NULL)
                 return ERRO;
@@ -455,79 +455,133 @@ int delete2 (char *filename)
         continue;
         }
 
-        // inserir validação de nome.
 
         qtd++;
     }
 
     char *pathArray[qtd];
-    }
-    // transformar filename para array.
+    nomeParaArray(filename,pathArray);
 
-/*
+    if(qtd>0)
+    {
+        if(filename[0]=='/')
+            nro_cluster = superbloco->RootDirCluster;
+        else
+            nro_cluster = cluster_diretorio_corrente;
 
-
-
-	char *pathArray[qtd];
-
-	filenameToArray(filename,pathArray);
-
-	if(qtd>0){
-
-		if(filename[0]=='/'){
-			//ler a partir da raiz
-			clusterNumber = superbloco->RootDirCluster;
-
-		}
-		else{
-			clusterNumber = cwdDirCluster;
-		}
-
-		ultimoClusterEncontrado = clusterNumber;
+        ultimo_cluster = nro_cluster;
 		int i;
-		for (i = 0; i < qtd-1; ++i) {
+		for (i = 0; i < qtd-1; ++i)
+        {
+			nro_cluster = existDir(ultimo_cluster,pathArray[i]);
 
-			clusterNumber = existDir(ultimoClusterEncontrado,pathArray[i]);
+			if(nro_cluster!=-1)
+				ultimo_cluster = nro_cluster;
+			else
+				return ERRO;
+        }
 
-			if(clusterNumber!=-1){
-				ultimoClusterEncontrado = clusterNumber;
-			}
-			else{
-				return -1;
-			}
-		}
+		struct t2fs_record* registroArquivo = buscarEntrada(ultimo_cluster, pathArray[qtd - 1]);
 
-		struct t2fs_record* fileRecord = getFileEntry(ultimoClusterEncontrado, pathArray[qtd - 1]);
+		if(registroArquivo!=NULL && registroArquivo->TypeVal!=0x00)
+        {
 
-		if(fileRecord!=NULL && fileRecord->TypeVal!=0x00){
-
-			DWORD fat_entry = fileRecord->firstCluster;
+			DWORD entrada_FAT = registroArquivo->firstCluster;
 			DWORD fatEntryDel;
 
 			//deletando entrada na FAT relacionado ao arquivo
-			while(fat_entry >= 0x00000002 && fat_entry<=0xFFFFFFFD){
-				//printf("FAT entry: 0x%08X\n",fat_entry);
-				fatEntryDel = fat_entry;
-				fat_entry = readFromFAT(fatEntryDel);
-				writeToFAT(fatEntryDel, 0x00000000);
-				readFromFAT(fatEntryDel);
+			// transformar isso em funcao
+			while(entrada_FAT >= 0x00000002 && entrada_FAT<=0xFFFFFFFD){
+				//printf("FAT entry: 0x%08X\n",entrada_FAT);
+				fatEntryDel = entrada_FAT;
+				entrada_FAT = lerFAT(fatEntryDel);
+				gravarFAT(fatEntryDel, 0x00000000);
+				lerFAT(fatEntryDel);
 			}
 
-			deleteFileEntry(ultimoClusterEncontrado,fileRecord->name);
+			deletarEntrada(ultimoClusterEncontrado,registroArquivo->name);
 
 			return 0;
 		}
-		else{
-			//nao foi possivel deletar: nao existe arquivo  ou arquivo invalido
-			return -1;
+    }
+    else
+			return ERRO; // Erro: arquivo não existe.
+
+    }
+}
+
+int deletarEntrada(DWORD clusterNumber,char* nomeArquivo){
+
+	BYTE buffer[SECTOR_SIZE];
+	DWORD firstClusterSector = getFirstSectorOfCluster(clusterNumber);
+	struct t2fs_record* t2fsRecord = malloc(sizeof(struct t2fs_record)*4);
+	int entradaDir =0;
+
+	//printf("deleteFileEntry, Verificando se existe arquivo chamado: %s no cluster: 0x%08X\n",nomeArquivo,clusterNumber);
+
+	int i,j;
+	for (i = 0; i < superbloco->SectorsPerCluster; ++i) {
+
+		read_sector(firstClusterSector+i,(unsigned char *)buffer);
+		memcpy(t2fsRecord,&buffer[0],SECTOR_SIZE);
+
+		for (j = 0; j < 4; ++j) {
+			//printf("    Entrada de diretorio %d: %s\n",entradaDir,t2fsRecord[j].name);
+			if(strcmp(t2fsRecord[j].name,nomeArquivo)==0 && t2fsRecord[j].TypeVal==0x01){
+				//printf("Encontrou arquivo com nome: %s\n",nomeArquivo);
+
+				struct t2fs_record* record = malloc(sizeof(struct t2fs_record));
+				record->TypeVal=0x00;
+				record->bytesFileSize=0;
+				record->firstCluster=0xFFFFFFFF;
+
+				memcpy(&t2fsRecord[j],record, sizeof(struct t2fs_record));
+
+				memcpy(&buffer[0],t2fsRecord,SECTOR_SIZE);
+
+				if(write_sector(firstClusterSector+i,(unsigned char*)buffer)!=0){
+					//printf("Error deleting entry\n");
+					return -2;
+				}
+				//printf("Deletou arquivo com sucesso!\n");
+				return 0;
+
+
+			}
+			entradaDir++;
 		}
 	}
-
 	return -1;
+}
 
+struct t2fs_record* buscarEntrada(DWORD clusterNumber, char *nomeArquivo){
 
+	BYTE buffer[SECTOR_SIZE];
+	DWORD firstClusterSector = getFirstSectorOfCluster(clusterNumber);
+	struct t2fs_record* t2fsRecord = malloc(sizeof(struct t2fs_record)*4);
+	int entradaDir =0;
 
+	//printf("Verificando se existe arquivo chamado: %s no cluster: 0x%08X\n",nomeArquivo,clusterNumber);
 
+	int i,j;
+	for (i = 0; i < superbloco->SectorsPerCluster; ++i) {
+
+		read_sector(firstClusterSector+i,(unsigned char *)buffer);
+		memcpy(t2fsRecord,&buffer[0],SECTOR_SIZE);
+
+		for (j = 0; j < 4; ++j) {
+			//printf("    Entrada de diretorio %d: %s\n",entradaDir,t2fsRecord[j].name);
+			if(strcmp(t2fsRecord[j].name,nomeArquivo)==0 && t2fsRecord[j].TypeVal==0x01){
+				//printf("Encontrou arquivo com nome: %s\n",nomeArquivo);
+
+				struct t2fs_record* retorno = malloc(sizeof(struct t2fs_record));
+				memcpy(retorno,&t2fsRecord[j], sizeof(struct t2fs_record));
+				return retorno;
+			}
+			entradaDir++;
+		}
+	}
+	return NULL;
 }
 
 int validaNome(char* nome){
@@ -535,22 +589,29 @@ int validaNome(char* nome){
 	//printf("size %d\n",strlen(nome));
 	if(strlen(nome)>MAX_FILE_NAME_SIZE){
 		//printf("Name is too long.\n");
-		return -1;
+		return ERRO;
 	}
 	int i;
 	for (i = 0; i <strlen(nome) ; ++i) {
 		if(nome[i]<0x21||nome[i]>0x7a){
-			return -1;
+			return ERRO;
 		}
 
 	}
-	return 0;
+	return SUCESSO;
 }
 
-*/
-
-
+void nomeParaArray(char *str,char *array[])
+{
+	int index = 0;
+	array[index] = strtok(str,"/");
+	while(array[index]!=NULL)
+    {
+		array[++index] = strtok(NULL,"/");
+	}
 }
+
+
 
 
 /*-----------------------------------------------------------------------------
@@ -579,6 +640,37 @@ Saída:	Se a operação foi realizada com sucesso, a função retorna "0" (zero).
 	Em caso de erro, será retornado um valor diferente de zero.
 -----------------------------------------------------------------------------*/
 int close2 (FILE2 handle);
+
+
+/*
+int close2 (FILE2 handle){
+
+	init();
+
+	if(handle<0 || handle>MAX_DIR){
+		//tentando fechar handle fora do limite permitido (0-9)
+		// para maximo de 10 arquivos aberto
+		return -1;
+	}
+	if(fileList[handle]->ocupado == 0){
+		//tentando fechar arquivo livre
+		return -1;
+	}
+
+	fileList[handle]->ocupado=0;
+
+    struct t2fs_record* record = malloc(sizeof(struct t2fs_record));
+
+    record->bytesFileSize = fileList[handle]->size;
+    strcpy(record->name, fileList[handle]->name);
+    record->TypeVal = fileList[handle]->type;
+    record->firstCluster = fileList[handle]->firstCluster;
+
+    updateEntry(fileList[handle]->clusterPai,record);
+
+	return 0;
+}
+*/
 
 
 /*-----------------------------------------------------------------------------
