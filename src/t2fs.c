@@ -628,7 +628,10 @@ Entra:	filename -> nome do arquivo a ser apagado.
 Saída:	Se a operação foi realizada com sucesso, a função retorna o handle do arquivo (número positivo)
 	Em caso de erro, deve ser retornado um valor negativo
 -----------------------------------------------------------------------------*/
-FILE2 open2 (char *filename);
+FILE2 open2 (char *filename)
+{
+
+}
 
 
 /*-----------------------------------------------------------------------------
@@ -640,24 +643,39 @@ Saída:	Se a operação foi realizada com sucesso, a função retorna "0" (zero).
 	Em caso de erro, será retornado um valor diferente de zero.
 -----------------------------------------------------------------------------*/
 int close2 (FILE2 handle);
+{
+    if(iniciar()==SUCESSO)
+    {
+        if(handle<0 || handle>MAX_DIR)
+            return ERRO;
+
+        if(arquivos[handle]->ocupado == 0)
+            return ERRO;
+
+        arquivos[handle]->ocupado=0;
+        struct t2fs_record* record = malloc(sizeof(struct t2fs_record));
+
+        record->bytesFileSize = arquivos[handle]->size;
+        strcpy(record->name, arquivos[handle]->name);
+        record->TypeVal = arquivos[handle]->type;
+        record->firstCluster = arquivos[handle]->firstCluster;
+
+        updateEntry(arquivos[handle]->clusterPai,record);
+
+        return SUCESSO;
+
+
+    }
+    else
+        return ERRO;
+}
 
 
 /*
-int close2 (FILE2 handle){
 
-	init();
 
-	if(handle<0 || handle>MAX_DIR){
-		//tentando fechar handle fora do limite permitido (0-9)
-		// para maximo de 10 arquivos aberto
-		return -1;
-	}
-	if(fileList[handle]->ocupado == 0){
-		//tentando fechar arquivo livre
-		return -1;
-	}
 
-	fileList[handle]->ocupado=0;
+
 
     struct t2fs_record* record = malloc(sizeof(struct t2fs_record));
 
