@@ -32,6 +32,7 @@ char* diretorio_corrente;
 char raiz = "/";
 struct t2fs_superbloco* superbloco;
 DWORD cluster_diretorio_corrente;
+DWORD cluster_Arquivo_Recem_Aberto;
 
 DIRENTRY_t* diretorios[MAX_DIR];
 OPENFILE_t arquivos[MAX_ARQ];
@@ -362,7 +363,7 @@ FILE2 create2 (char *filename)
 	while((componente = strsep(&path, "/")) != NULL)
 	{
 		if (strcmp(componente, "") == 0)
-		}
+		{
 			if (path == NULL)
 				return ERRO;
 			continue;
@@ -418,8 +419,10 @@ FILE2 create2 (char *filename)
 	}
     return handle;
 
-    }else
+    }
+    else
         return ERRO;
+    }
 }
 
 
@@ -644,7 +647,7 @@ FILE2 open2 (char *filename)
 			arquivos[handle]->size=record->bytesFileSize;
 			arquivos[handle]->firstCluster = record->firstCluster;
 			strcpy(arquivos[handle]->name, record->name);
-            arquivos[handle]->clusterPai = clusterArquivoRecemAberto;
+            arquivos[handle]->clusterPai = cluster_Arquivo_Recem_Aberto;
 
 			return handle;
 		}
@@ -679,7 +682,7 @@ struct t2fs_record* existFilePath(char* filename){
 	}
 	char *pathArray[qtd];
 
-	filenameToArray(filename,pathArray);
+	filenameParaArray(filename,pathArray);
 
 
 
@@ -704,10 +707,10 @@ struct t2fs_record* existFilePath(char* filename){
 	}
 
 
-	struct t2fs_record* fileRecord = getFileEntry(parentCluster, pathArray[qtd - 1]);
+	struct t2fs_record* fileRecord = busca_entrada_arquivo(parentCluster, pathArray[qtd - 1]);
 
 	if(fileRecord!=NULL){
-		clusterArquivoRecemAberto = clusterNumber;
+		cluster_Arquivo_Recem_Aberto = clusterNumber;
 		return fileRecord;
 	}
 	else
@@ -717,73 +720,6 @@ struct t2fs_record* existFilePath(char* filename){
 	return NULL;
 }
 
-/*
-
-
-
-
-
-
-		if(handle!=-1){
-
-			if(validaNome(record->name)==-1){
-				return -32;
-			}
-
-			fileList[handle]->ocupado=1;
-			fileList[handle]->cp=0;
-			fileList[handle]->type=record->TypeVal;
-			fileList[handle]->size=record->bytesFileSize;
-			fileList[handle]->firstCluster = record->firstCluster;
-			strcpy(fileList[handle]->name, record->name);
-            fileList[handle]->clusterPai = clusterArquivoRecemAberto;
-
-			return handle;
-		}
-		else{
-			//printf("Limite de arquivos abertos esgotado.\n");
-			return -1;
-		}
-	}
-
-}
-
-
-int getParentDir(char *path, char* parentPath){
-	char *pathBuffer = malloc(sizeof(char)*strlen(path));
-	int levels, i;
-
-
-	strcpy(pathBuffer, path);
-
-	levels = countPathLevels(pathBuffer);
-
-	strcpy(pathBuffer, path);
-
-	char *pathArray[levels];
-	filenameToArray(pathBuffer, pathArray);
-
-	strcpy(parentPath, "");
-	if(levels == 1){
-		strcpy(parentPath, "/");
-
-		return 0;
-	}
-	else {
-		for (i = 0; i < levels - 1; i++) {
-			strcat(parentPath, "/");
-			strcat(parentPath, pathArray[i]);
-		}
-
-		return 0;
-	}
-
-	return -1;
-}
-
-
-
-*/
 
 /*-----------------------------------------------------------------------------
 Função:	Fecha o arquivo identificado pelo parâmetro "handle".
