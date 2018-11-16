@@ -8,6 +8,10 @@
 #define ERRO -1
 #define SUCESSO 0
 
+#define MAX_DIR 5
+#define MAX_ARQ 5
+#define MAX_FILE 5
+
 /** Item on the open files list */
 typedef struct OPENFILE_s{
 	int ocupado;					//0 = closed, 1 = open
@@ -29,18 +33,22 @@ typedef struct DirEntry_s{
 // globais
 int iniciar_fs = 0;
 char* diretorio_corrente;
-char raiz = "/";
+char raiz = '/';
 struct t2fs_superbloco* superbloco;
 DWORD cluster_diretorio_corrente;
 DWORD cluster_Arquivo_Recem_Aberto;
 
 DIRENTRY_t* diretorios[MAX_DIR];
-OPENFILE_t arquivos[MAX_ARQ];
+OPENFILE_t* arquivos[MAX_ARQ];
 
 
 
+struct t2fs_record* buscarEntrada(DWORD clusterNumber, char *nomeArquivo);
+void nomeParaArray(char *str,char *array[]);
+struct t2fs_record* existFilePath(char* filename);
+int close2 (FILE2 handle);
 
-
+//Avaliar e corrigir comentarios nas linhas 479 , 397 , 391 e 371.
 
 //funcao inicializa FS.
 int iniciar ()
@@ -64,7 +72,7 @@ int iniciar ()
         diretorio_corrente = malloc((sizeof(char)*MAX_FILE_NAME_SIZE));
 
         // diretorio_corrente recebe endereço da raiz.
-        strcpy(diretorio_corrente, raiz);
+        strcpy(diretorio_corrente, &raiz);
 
         // diretório corrente recebe p número do cluster.
         cluster_diretorio_corrente = superbloco->RootDirCluster;
@@ -248,7 +256,7 @@ DWORD gravarRegistro(DWORD nro_cluster, struct t2fs_record *record){
 	}
 	return ERRO;
 }
-}
+
 
 
 
@@ -285,45 +293,11 @@ DWORD existDir(DWORD dirClusterNumber,char *filename)
 
 }
 
-int gravarFAT(int entry, int value){
-	int sector, sectorOffset, byteOffset;
-	BYTE sectorBuffer[SECTOR_SIZE];
-
-	sectorOffset = entry/(SECTOR_SIZE/4);
-	sector = superbloco->pFATSectorStart + sectorOffset;
-
-	if(read_sector(sector, sectorBuffer) != 0){
-		return ERRO;
-	}
-
-	byteOffset = (entry%(SECTOR_SIZE/4))*4;	//Calculates where in the sector is the entry
-	memcpy(&sectorBuffer[byteOffset], &value, 4);	//Changes the entry
-
-	//Writes the updated sector back to disk
-	if(write_sector(sector, sectorBuffer) != 0){
-		//printf("Error writing FAT.\n");
-		return ERRO;
-	}
-
-	return SUCESSO;
-}
 
 
 
-DWORD lerFAT(int entry){
-	int sector, sectorOffset, byteOffset;
-	BYTE sectorBuffer[SECTOR_SIZE];
-	int content;
 
-	sectorOffset = entry/(SECTOR_SIZE/4);
-	sector = superbloco->pFATSectorStart + sectorOffset;
 
-	read_sector(sector, sectorBuffer);
-
-	byteOffset = (entry%(SECTOR_SIZE/4))*4;
-	memcpy(&content, &sectorBuffer[byteOffset], 4);
-	return content;
-}
 
 
 /*-----------------------------------------------------------------------------
@@ -343,7 +317,7 @@ FILE2 create2 (char *filename)
 {
     if(iniciar()==SUCESSO){
 
-    	char* componente, path;
+    	char* componente, *path;
         char* buffer_path = malloc(sizeof(char)*strlen(filename));
         int handle = getHandleArq();
         int qtd = 0;
@@ -360,7 +334,7 @@ FILE2 create2 (char *filename)
         if(handle < 0)
             return ERRO;
 
-	while((componente = strsep(&path, "/")) != NULL)
+	while((componente = strsep(&path, "/")) != NULL) //path nao foi atribuida com nada
 	{
 		if (strcmp(componente, "") == 0)
 		{
@@ -395,8 +369,8 @@ FILE2 create2 (char *filename)
 	if (filename[0] == '/')
 		diretorio_pai = superbloco->RootDirCluster;
 	else
-		diretorio_pai = cwdCluster;
-
+		diretorio_pai = cwdCluster; //cwdCluster nao foi declarado em nenhum lugar
+    int i;
 	for(i=0; i < qtd-1; i++)
 	{
 		diretorio_pai = existDir(diretorio_pai, pathArray[i]);
@@ -414,13 +388,13 @@ FILE2 create2 (char *filename)
 		if(gravarRegistro(diretorio_pai, &record) == -1)
 			return ERRO;
 		lerFAT(nro_cluster);
-		gravarFAT(clusterNunber, 0xFFFFFFFF);
+		gravarFAT(clusterNumber, 0xFFFFFFFF); //clusterNumber nao foi declarada nessa funcao e nem global, talvez precise colocar como parametro
 		lerFAT(nro_cluster);
 	}
     return handle;
 
     }
-    else
+    else{ //else SEM if
         return ERRO;
     }
 }
@@ -502,7 +476,7 @@ int delete2 (char *filename)
 				lerFAT(fatEntryDel);
 			}
 
-			deletarEntrada(ultimoClusterEncontrado,registroArquivo->name);
+			deletarEntrada(ultimoClusterEncontrado,registroArquivo->name); //ultimoClusterEncontrado nao foi declarado nesse escopo
 
 			return 0;
 		}
@@ -690,7 +664,7 @@ struct t2fs_record* existFilePath(char* filename){
 		clusterNumber = superbloco->RootDirCluster;
 	}
 	else{
-		clusterNumber = cwdDirCluster;
+		clusterNumber = cwdDirCluster; //cwdDirCluster nao exsiste nesse escopo
 	}
 
 	parentCluster = clusterNumber;
@@ -729,7 +703,7 @@ Entra:	handle -> identificador do arquivo a ser fechado
 Saída:	Se a operação foi realizada com sucesso, a função retorna "0" (zero).
 	Em caso de erro, será retornado um valor diferente de zero.
 -----------------------------------------------------------------------------*/
-int close2 (FILE2 handle);
+int close2 (FILE2 handle)
 {
     if(iniciar()==SUCESSO)
     {
