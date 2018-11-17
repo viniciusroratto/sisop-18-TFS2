@@ -14,13 +14,13 @@
 
 /** Item on the open files list */
 typedef struct OPENFILE_s{
-	int ocupado;					//0 = closed, 1 = open
-	BYTE type;						//0 = invalid, 1 = file, 2 = directory
-	DWORD firstCluster;				//Number of the first cluster used
-	int cp;							//Current pointer (points to the byte "in use")
-	int size;						//File size in bytes
-    DWORD clusterPai;                //numero do cluster do pai
-    char name[MAX_FILE_NAME_SIZE];   //nome do arquivo
+	int ocupado;
+	BYTE type;
+	DWORD firstCluster;
+	int cp;
+	int size;
+    DWORD clusterPai;
+    char name[MAX_FILE_NAME_SIZE];
 } OPENFILE_t;
 
 typedef struct DirEntry_s{
@@ -99,6 +99,13 @@ int iniciar ()
     return SUCESSO;
 }
 
+DWORD getFirstSectorOfCluster(DWORD clusterNumber)
+{
+	DWORD n = clusterNumber*superbloco->SectorsPerCluster + superbloco->DataSectorStart;
+	return n;
+}
+
+
 
 /*-----------------------------------------------------------------------------
 Função: Usada para identificar os desenvolvedores do T2FS.
@@ -152,6 +159,52 @@ DWORD buscaPrimeiroSetor(DWORD nro_cluster){
 	DWORD n = nro_cluster*superbloco->SectorsPerCluster + superbloco->DataSectorStart;
 	return n;
 }
+
+
+int getFileHandle(){
+	int i;
+	for (i=0; i<MAX_FILE; ++i) {
+
+		if(arquivos[i]->ocupado == 0){
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+WORD updateEntry(DWORD clusterNumber, struct t2fs_record *record) {
+    BYTE buffer[SECTOR_SIZE];
+    DWORD firstClusterSector = getFirstSectorOfCluster(clusterNumber);
+    struct t2fs_record *t2fsRecord = malloc(sizeof(struct t2fs_record) * 4);
+    int entradaDir = 0;
+
+    //printf("Escrever no cluster 0x%08X\n",clusterNumber);
+	int i,j;
+    for (i = 0; i < superbloco->SectorsPerCluster; ++i) {
+
+        read_sector(firstClusterSector + i, (unsigned char *) buffer);
+        memcpy(t2fsRecord, &buffer[0], SECTOR_SIZE);
+
+        for (j = 0; j < 4; ++j) {
+            if (strcmp(t2fsRecord[j].name, record->name) == 0) {
+                // printf("Achou entrada livre na posicao: %d\n",entradaDir);
+
+                memcpy(&t2fsRecord[j], record, sizeof(struct t2fs_record));
+                memcpy(&buffer[0], t2fsRecord, SECTOR_SIZE);
+
+                if (write_sector(firstClusterSector + i, (unsigned char *) buffer) != 0) {
+                    //printf("Error updating entry.\n");
+                    return -2;
+                }
+                //printf("Atualizou arquivo %s com sucesso!\n", t2fsRecord[j].name);
+                return 0;
+            }
+            entradaDir++;
+        }
+    }
+return -1;
+
 
 
 struct t2fs_record* busca_entrada_arquivo(DWORD nro_cluster, char *nomeArquivo){
@@ -327,6 +380,10 @@ FILE2 create2 (char *filename)
 
         strcpy(buffer_path, filename);
 
+        path = malloc(sizeof(char )*strlen(filename));
+        strcpy(path,filename);
+
+
 	// caso de arquivo nulo ou vazio.
         if (filename = NULL || strlen(filename)==0)
             return ERRO;
@@ -363,13 +420,13 @@ FILE2 create2 (char *filename)
 
 
 	strcpy(arquivos[handle]->name, record.name);
-	record.TypeVal-0x01;
+	record.TypeVal=0x01;
 
 
 	if (filename[0] == '/')
 		diretorio_pai = superbloco->RootDirCluster;
 	else
-		diretorio_pai = cluster_diretorio_corrente; //cwdCluster nao foi declarado em nenhum lugar
+		diretorio_pai = cluster_diretorio_corrente; //
     int i;
 	for(i=0; i < qtd-1; i++)
 	{
@@ -398,6 +455,8 @@ FILE2 create2 (char *filename)
         return ERRO;
     }
 }
+
+
 
 
 /*-----------------------------------------------------------------------------
@@ -478,7 +537,7 @@ int delete2 (char *filename)
 
 			deletarEntrada(ultimo_cluster,registroArquivo->name);
 
-			return 0;
+			return SUCESSO;
 		}
     }
     else
@@ -518,17 +577,17 @@ int deletarEntrada(DWORD clusterNumber,char* nomeArquivo){
 
 				if(write_sector(firstClusterSector+i,(unsigned char*)buffer)!=0){
 					//printf("Error deleting entry\n");
-					return -2;
+					return ERRO;
 				}
 				//printf("Deletou arquivo com sucesso!\n");
-				return 0;
+				return SUCESSO;
 
 
 			}
 			entradaDir++;
 		}
 	}
-	return -1;
+	return ERRO;
 }
 
 struct t2fs_record* buscarEntrada(DWORD clusterNumber, char *nomeArquivo){
@@ -664,7 +723,7 @@ struct t2fs_record* existFilePath(char* filename){
 		clusterNumber = superbloco->RootDirCluster;
 	}
 	else{
-		clusterNumber = cwdDirCluster; //cwdDirCluster nao exsiste nesse escopo
+		clusterNumber = cluster_diretorio_corrente; //cwdDirCluster nao exsiste nesse escopo
 	}
 
 	parentCluster = clusterNumber;
@@ -914,3 +973,13 @@ Saída:	Se a operação foi realizada com sucesso, a função retorna "0" (zero).
 	Em caso de erro, será retornado um valor diferente de zero.
 -----------------------------------------------------------------------------*/
 int ln2(char *linkname, char *filename);
+
+//
+//void main (){
+//
+//    int size = 2;
+//    char* name;
+//
+//    identify2(name, size);
+//
+//}
