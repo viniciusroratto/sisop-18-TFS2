@@ -348,7 +348,7 @@ FILE2 create2 (char *filename)
 			return ERRO;
 		else
 			memcpy(record.name, componente, MAX_FILE_NAME_SIZE);
-
+	}
 
 
 	char *pathArray[qtd];
@@ -369,7 +369,7 @@ FILE2 create2 (char *filename)
 	if (filename[0] == '/')
 		diretorio_pai = superbloco->RootDirCluster;
 	else
-		diretorio_pai = cwdCluster; //cwdCluster nao foi declarado em nenhum lugar
+		diretorio_pai = cluster_diretorio_corrente; //cwdCluster nao foi declarado em nenhum lugar
     int i;
 	for(i=0; i < qtd-1; i++)
 	{
@@ -388,13 +388,13 @@ FILE2 create2 (char *filename)
 		if(gravarRegistro(diretorio_pai, &record) == -1)
 			return ERRO;
 		lerFAT(nro_cluster);
-		gravarFAT(clusterNumber, 0xFFFFFFFF); //clusterNumber nao foi declarada nessa funcao e nem global, talvez precise colocar como parametro
+		gravarFAT(nro_cluster, 0xFFFFFFFF);
 		lerFAT(nro_cluster);
 	}
     return handle;
 
     }
-    else{ //else SEM if
+    else{ // else com o primeiro IF da função.
         return ERRO;
     }
 }
@@ -476,7 +476,7 @@ int delete2 (char *filename)
 				lerFAT(fatEntryDel);
 			}
 
-			deletarEntrada(ultimoClusterEncontrado,registroArquivo->name); //ultimoClusterEncontrado nao foi declarado nesse escopo
+			deletarEntrada(ultimo_cluster,registroArquivo->name);
 
 			return 0;
 		}
