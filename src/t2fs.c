@@ -48,7 +48,6 @@ void nomeParaArray(char *str,char *array[]);
 struct t2fs_record* existFilePath(char* filename);
 int close2 (FILE2 handle);
 
-//Avaliar e corrigir comentarios nas linhas 479 , 397 , 391 e 371.
 
 //funcao inicializa FS.
 int iniciar ()
@@ -203,8 +202,8 @@ WORD updateEntry(DWORD clusterNumber, struct t2fs_record *record) {
             entradaDir++;
         }
     }
-return -1;
-
+    return -1;
+}
 
 
 struct t2fs_record* busca_entrada_arquivo(DWORD nro_cluster, char *nomeArquivo){
@@ -385,7 +384,7 @@ FILE2 create2 (char *filename)
 
 
 	// caso de arquivo nulo ou vazio.
-        if (filename = NULL || strlen(filename)==0)
+        if (filename == NULL || strlen(filename)==0)
             return ERRO;
 
         if(handle < 0)
@@ -791,6 +790,18 @@ int close2 (FILE2 handle)
 }
 
 
+int lerCluster(int firstSector, BYTE* buffer)
+{
+    BYTE sectBuffer[SECTOR_SIZE];
+    int i;
+    for(i=0;i<superbloco->SectorsPerCluster;i++)
+    {
+        read_sector(firstSector+i,sectBuffer);
+        memcpy(&buffer[SECTOR_SIZE], sectBuffer,SECTOR_SIZE);
+    }
+    return 0;
+}
+
 
 /*-----------------------------------------------------------------------------
 Função:	Realiza a leitura de "size" bytes do arquivo identificado por "handle".
@@ -805,7 +816,61 @@ Saída:	Se a operação foi realizada com sucesso, a função retorna o número de byt
 	Se o valor retornado for menor do que "size", então o contador de posição atingiu o final do arquivo.
 	Em caso de erro, será retornado um valor negativo.
 -----------------------------------------------------------------------------*/
-int read2 (FILE2 handle, char *buffer, int size);
+int read2 (FILE2 handle, char *buffer, int size)
+{
+    OPENFILE_t* arq;
+    BYTE *buffclust = malloc(sizeof(BYTE) * superbloco->SectorsPerCluster* SECTOR_SIZE);
+    DWORD clust, firstSector, cpClust, cpByte, cpInitial;
+    int bytesToRead, bytesRead;
+    int readFlag, i;
+    iniciar();
+    if( handle < 0 || handle > 9)
+    {
+        return -1;
+    }
+
+    arq = arquivos[handle];
+
+    if(arq->type != TYPEVAL_REGULAR)
+    {
+        return -1;
+    }
+    readFlag=1;
+    bytesRead =0;
+    cpInitial= arq->cp;
+    clust = arq->firstCluster;
+    cpClust = cpInitial / (superbloco->SectorsPerCluster* SECTOR_SIZE);
+    for(i=0;i<cpClust;i++){
+        clust =lerFAT(clust);
+    }
+    firstSector = buscaPrimeiroSetor(clust);
+    cpByte = arq->cp %(superbloco->SectorsPerCluster* SECTOR_SIZE);
+
+    while(readFlag ==1)
+    {
+        lerCluster(firstSector,buffclust);
+        bytesToRead= (superbloco->SectorsPerCluster * SECTOR_SIZE)-cpByte;
+        if(bytesToRead > size - bytesRead){
+            bytesToRead= size -bytesRead;
+            readFlag =0;
+        }
+        if(bytesRead + bytesToRead > arq->size - cpInitial)
+        {
+            bytesToRead = arq->size - (cpInitial + bytesRead);
+            readFlag =0;
+        }
+        memcpy(&buffer[bytesRead],&buffclust[cpByte],bytesToRead);
+
+        bytesRead+=bytesToRead;
+        arq->cp += bytesToRead;
+
+        clust= lerFAT(clust);
+        firstSector = superbloco->DataSectorStart + (clust * superbloco->SectorsPerCluster);
+        cpByte =  cpByte = arq->cp %(superbloco->SectorsPerCluster* SECTOR_SIZE);
+    }
+    return bytesRead;
+
+}
 
 
 /*-----------------------------------------------------------------------------
